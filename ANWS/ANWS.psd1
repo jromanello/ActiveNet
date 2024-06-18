@@ -3,11 +3,15 @@
     RootModule = 'ANWS.psm1'
 
     # Version number of this module.
-    ModuleVersion = '1.0' 
+    ModuleVersion = '1.0.1' 
     
     <#  
         1.0 4-APR-2024
             Created module with functions Install-ANWS, Set-ANWSRestart, Uninstall-ANWS
+        
+        1.0.1 18-JUN-2024
+            Fixed error with Install-ANWS
+            Updated code / cleaned up function help 
     #>
 
     # ID used to uniquely identify this module
