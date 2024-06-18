@@ -2,8 +2,7 @@ function Install-ANWS {
     <#
         .SYNOPSIS
             This function installs the ActiveNet Workstation Service (ANWS) from a specified source or by downloading it.
-            It provides and option for creating a shortcut to restart the service.
-            Previous installations will be overwritten.
+            Previous installations will be overwritten and a transcript log will be saved on the system drive.
 
         .PARAMETER Source
             Specifies the ANWS zip file to be used as the installer source. This parameter is mandatory if the 'Download' parameter is NOT used.
@@ -12,25 +11,20 @@ function Install-ANWS {
             If this switch is used, the function will download the ANWS zip file from the ActiveNet website.
 
         .PARAMETER Destination
-            Specifies the destination where the ANWS zip file will be saved and extracted. This parameter is mandatory. Files will be removed upon completion.
+            This parameter is mandatory. It specifies a temporary working directory. This destination is where the ANWS zip file
+            will be saved and extracted. Files will be removed upon completion.
 
-        .PARAMETER Shortcut
-            If this switch is used, the function will create a shortcut to restart the ANWS.
-
-        .PARAMETER ShortcutLocation
-            Specifies the location where the shortcut to restart the ANWS will be created. The default location is the public desktop.
-        
         .EXAMPLE
             PS> Install-ANWS -Download -Destination 'C:\Temp'
 
-        .EXAMPLE
-            PS> Install-ANWS -Download -Destination 'C:\Temp' -Shorcut -ShortcutLocation 'C:\Users\ActiveNetUser\Desktop'
+            This example downloads the ANWS zip file from the ActiveNet website and installs it.
+            The zip file is saved and extracted in the 'C:\Temp' directory.
 
         .EXAMPLE
             PS> Install-ANWS -Source "\\Server\ANWS Downloads\activenetworkstationservice.zip" -Destination 'C:\Temp'
 
-        .EXAMPLE
-            PS> Install-ANWS -Source "\\Server\ANWS Downloads\activenetworkstationservice.zip" -Destination 'C:\Temp' -Shortcut
+            This example uses the specified ANWS zip file as the installer source.
+            The zip file is saved and extracted in the 'C:\Temp' directory.
     #>
 
     [CmdletBinding(DefaultParameterSetName='Source')]
@@ -42,13 +36,7 @@ function Install-ANWS {
         [switch]$Download,
         
         [Parameter(Mandatory=$true)]
-        [string]$Destination,
-
-        [Parameter()]
-        [switch]$Shortcut,
-
-        [Parameter()]
-        [string]$ShortcutLocation = "$env:PUBLIC\desktop"
+        [string]$Destination
     )
 
     # Variables
@@ -149,23 +137,6 @@ function Install-ANWS {
         return
     }
     
-    # Set shortcuts
-    if ($shortcut) {
-        # Permission to let authenticated users restart ANWS
-        cmd /c sc sdset $anws "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)(A;;RPWPCR;;;AU)S:(AU;FA;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;WD)" 
-        
-        # Create bat
-        New-Item -Path $shortcutLocation -Name 'restartanws.bat' -Value "net stop $anws `nnet start $anws" -force -ErrorAction SilentlyContinue | Out-Null
-        [System.IO.File]::SetAttributes("$shortcutlocation\restartanws.bat", 'Hidden')
-        
-        # Create shortcut
-        $wshshell = New-Object -ComObject ("WScript.Shell")
-        $shortcut = $wshShell.CreateShortcut((Join-Path $shortcutLocation "Restart ActiveNet.lnk"))
-        $shortcut.TargetPath = "$shortcutLocation\restartanws.bat"
-        $shortcut.IconLocation = 'C:\Windows\System32\shell32.dll,238'
-        $shortcut.Save()
-    }
-
     # Cleanup
     Remove-Item -Path $zip -Force
     Remove-Item -Path $extract -Recurse -Force
@@ -173,113 +144,4 @@ function Install-ANWS {
     # Stop transcript
     Write-Verbose -Message "ActiveNet Workstation Service v$version installed" -Verbose
     Stop-Transcript
-}
-
-function Set-ANWSRestart {
-    <#
-    .SYNOPSIS
-        The function will grant permissions to authenticated users to restart restart the ActiveNet Workstation Service service and
-        create a shortcut to do so.
-    
-    .PARAMETER Destination
-        The path where the shortcut should be created. If not specified, the function will default to the Public Desktop.
-
-    .EXAMPLE
-        PS> Set-ANWSRestart
-    #>
-
-    param(
-        [string]$ShortcutLocation = "$env:PUBLIC\desktop"
-    )
-
-    # Variables
-    $anws = 'activenetworkstationservice'
-
-    try {
-        # Permission to let authenticated users restart ANWS
-        cmd /c sc sdset $anws "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)(A;;RPWPCR;;;AU)S:(AU;FA;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;WD)" 
-        
-        # Create bat
-        New-Item -Path $shortcutLocation -Name 'restartanws.bat' -Value "net stop $anws `nnet start $anws" -force -ErrorAction SilentlyContinue | Out-Null
-        [System.IO.File]::SetAttributes("$shortcutlocation\restartanws.bat", 'Hidden')
-
-        # Create shortcut
-        $wshshell = New-Object -ComObject ("WScript.Shell")
-        $shortcut = $wshShell.CreateShortcut((Join-Path $shortcutLocation "Restart ActiveNet.lnk"))
-        $shortcut.TargetPath = "$shortcutLocation\restartanws.bat"
-        $shortcut.IconLocation = 'C:\Windows\System32\shell32.dll,238'
-        $shortcut.Save()
-    } catch {
-        Write-Verbose -Message "An error occurred: $($_.Exception.Message)" -Verbose
-    }
-}
-
-function Uninstall-ANWS {
-    <#
-        .SYNOPSIS
-            This function is used to uninstall ActiveNet Workstation Service. PowerShell 5 is started to ensure functionality.
-            If an installation is detected it will check to make sure the service exists and that Java is stopped before uninstallation.
-            After uninstallation it will verify the service has been removed as well as anything left behind in Program Files.
-            
-        .EXAMPLE
-            PS> Uninstall-ActiveNet
-    #>
-            
-    function Uninstall-ActiveNet () {
-        # Variables
-        $activeNet = 'ActiveNet Workstation Service'
-        $installPath = $installPath = "$env:ProgramFiles(x86)\$ActiveNet"
-        $logFile = "$((Get-CimInstance -ClassName CIM_OperatingSystem).SystemDrive)\ANWS_UnInstall_Log_$(Get-Date -Format MMddHHmm).txt"
-
-        # Start Transcript
-        Start-Transcript -Append $logFile
-
-        try {
-            # Check for ANWS and Uninstall if Found
-            $installCheck = Get-Package -Name $activeNet -ErrorAction Stop
-
-            if ($installCheck) {
-                # Installation w/ missing service indicates a previous corrupt uninstall attempt and package uninstallation will fail
-                Write-Verbose -Message "Found $activeNet" -Verbose
-                if (!(Get-Service -DisplayName $activeNet -ErrorAction SilentlyContinue)) {
-                    New-Service -Name 'ActiveNetWorkstationService' -BinaryPathName 'C:\Program Files (x86)\ActiveNet Workstation Service\ActiveNet.ServiceContainer.exe'
-                }
-            
-                # Newer ANWS versions include a java folder
-                if (Get-Process -Name java -ErrorAction SilentlyContinue) {
-                    Stop-Process -Name java -Force
-                }
-            
-                # Uninstall 
-                Stop-Service -DisplayName $activeNet -Force
-                Uninstall-Package -Name 'ActiveNet Workstation Service' -Force
-                Write-Verbose -Message 'Uninstalled' -Verbose
-            }
-        }
-        catch {
-            Write-Verbose -Message 'Not Found' -Verbose
-            Write-Verbose -Message "Error: $($_.Exception.Message)" -Verbose
-        }
-        finally {
-            # Service Removal Double Check
-            if (Get-Service -DisplayName $activeNet -ErrorAction SilentlyContinue) {
-                cmd /c sc delete activenetworkstationservice
-            }
-        
-            # Orphaned Files Check
-            if (Test-Path $installPath) {
-                Remove-Item $installPath -Recurse -Force -ErrorAction Stop
-            }
-            
-            Stop-Transcript
-        }
-    }
-
-    $major = $PSVersionTable.PSVersion.Major
-
-    if ($major -eq 5) {
-        Uninstall-ActiveNet
-    } else {
-        powershell -command ${Function:Uninstall-ActiveNet}
-    }
 }
