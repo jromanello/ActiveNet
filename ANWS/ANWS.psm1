@@ -36,11 +36,7 @@ function Install-ANWS {
         [switch]$Download,
         
         [Parameter(Mandatory=$true)]
-<<<<<<< HEAD
         [string]$Destination
-=======
-        [string]$Destination,
->>>>>>> origin/main
     )
 
     # Variables
