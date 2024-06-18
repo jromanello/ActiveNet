@@ -2,8 +2,7 @@ function Install-ANWS {
     <#
         .SYNOPSIS
             This function installs the ActiveNet Workstation Service (ANWS) from a specified source or by downloading it.
-            It provides and option for creating a shortcut to restart the service.
-            Previous installations will be overwritten.
+            Previous installations will be overwritten and a transcript log will be saved on the system drive.
 
         .PARAMETER Source
             Specifies the ANWS zip file to be used as the installer source. This parameter is mandatory if the 'Download' parameter is NOT used.
@@ -12,25 +11,20 @@ function Install-ANWS {
             If this switch is used, the function will download the ANWS zip file from the ActiveNet website.
 
         .PARAMETER Destination
-            Specifies the destination where the ANWS zip file will be saved and extracted. This parameter is mandatory. Files will be removed upon completion.
+            This parameter is mandatory. It specifies a temporary working directory. This destination is where the ANWS zip file
+            will be saved and extracted. Files will be removed upon completion.
 
-        .PARAMETER Shortcut
-            If this switch is used, the function will create a shortcut to restart the ANWS.
-
-        .PARAMETER ShortcutLocation
-            Specifies the location where the shortcut to restart the ANWS will be created. The default location is the public desktop.
-        
         .EXAMPLE
             PS> Install-ANWS -Download -Destination 'C:\Temp'
 
-        .EXAMPLE
-            PS> Install-ANWS -Download -Destination 'C:\Temp' -Shorcut -ShortcutLocation 'C:\Users\ActiveNetUser\Desktop'
+            This example downloads the ANWS zip file from the ActiveNet website and installs it.
+            The zip file is saved and extracted in the 'C:\Temp' directory.
 
         .EXAMPLE
             PS> Install-ANWS -Source "\\Server\ANWS Downloads\activenetworkstationservice.zip" -Destination 'C:\Temp'
 
-        .EXAMPLE
-            PS> Install-ANWS -Source "\\Server\ANWS Downloads\activenetworkstationservice.zip" -Destination 'C:\Temp' -Shortcut
+            This example uses the specified ANWS zip file as the installer source.
+            The zip file is saved and extracted in the 'C:\Temp' directory.
     #>
 
     [CmdletBinding(DefaultParameterSetName='Source')]
@@ -42,13 +36,7 @@ function Install-ANWS {
         [switch]$Download,
         
         [Parameter(Mandatory=$true)]
-        [string]$Destination,
-
-        [Parameter()]
-        [switch]$Shortcut,
-
-        [Parameter()]
-        [string]$ShortcutLocation = "$env:PUBLIC\desktop"
+        [string]$Destination
     )
 
     # Variables
@@ -149,23 +137,6 @@ function Install-ANWS {
         return
     }
     
-    # Set shortcuts
-    if ($shortcut) {
-        # Permission to let authenticated users restart ANWS
-        cmd /c sc sdset $anws "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)(A;;RPWPCR;;;AU)S:(AU;FA;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;WD)" 
-        
-        # Create bat
-        New-Item -Path $shortcutLocation -Name 'restartanws.bat' -Value "net stop $anws `nnet start $anws" -force -ErrorAction SilentlyContinue | Out-Null
-        [System.IO.File]::SetAttributes("$shortcutlocation\restartanws.bat", 'Hidden')
-        
-        # Create shortcut
-        $wshshell = New-Object -ComObject ("WScript.Shell")
-        $shortcut = $wshShell.CreateShortcut((Join-Path $shortcutLocation "Restart ActiveNet.lnk"))
-        $shortcut.TargetPath = "$shortcutLocation\restartanws.bat"
-        $shortcut.IconLocation = 'C:\Windows\System32\shell32.dll,238'
-        $shortcut.Save()
-    }
-
     # Cleanup
     Remove-Item -Path $zip -Force
     Remove-Item -Path $extract -Recurse -Force
