@@ -3,7 +3,7 @@
 This PowerShell module provides three main functions for managing the ActiveNet Workstation Service (ANWS):
 
 ### 1. Install-ANWS
-Installs ANWS from a specified source or by downloading it from the ActiveNet website. It can also create a shortcut to restart the service. Previous installations will be overwritten.
+Installs ANWS from a specified source or by downloading it from the ActiveNet website. Previous installations will be overwritten.
 
 ### 2. Set-ANWSRestart
 Grants permissions to authenticated users to restart the ANWS service and creates a shortcut for this purpose.
@@ -18,7 +18,6 @@ Uninstalls ANWS, ensuring that Java is stopped before uninstallation and verifyi
   - Extracts the downloaded or specified zip file to the destination.
   - Installs ANWS using the extracted MSI installer.
   - Sets the service to automatically restart upon failure.
-  - Creates a shortcut to restart ANWS if the `Shortcut` switch is used.
   - Cleans up by removing the zip file and extracted contents.
   - Logs the installation process and results.
 
